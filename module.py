@@ -151,11 +151,8 @@ def apply_sliding_window(features, targets, window_size, overlap, avg = False):
         if avg:
             y_avg = np.mean(window_y)
             y_mapped = map_values(y_avg)
-            if y_mapped != 10:
-                sliding_X_data.append(window_X)
-                sliding_y_data.append(y_mapped)
-            else:
-                print(window_y)
+            sliding_X_data.append(window_X)
+            sliding_y_data.append(y_mapped)
 
         elif len(np.unique(window_y) == 1):
             sliding_X_data.append(window_X)
