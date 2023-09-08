@@ -122,11 +122,12 @@ class ResidualBlock(nn.Module):
         return out
 
 class ResNet(nn.Module):
-    def __init__(self, num_channels, num_classes):
+    def __init__(self, num_channels, num_classes, num_resblocks):
         super(ResNet, self).__init__()
 
         self.num_channels = num_channels
         self.num_classes = num_classes
+        self.num_resblocks = num_resblocks
         self.num_filters = 64
 
         self.avgpool1 = nn.AvgPool1d(kernel_size=4, stride=4)
@@ -136,13 +137,11 @@ class ResNet(nn.Module):
         self.relu = nn.ReLU(inplace=False)
         self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
 
-        self.resblock1 = ResidualBlock(self.num_filters, self.num_filters, bottleneck=False)
-        self.resblock2 = ResidualBlock(self.num_filters, self.num_filters, bottleneck=False)
-        self.resblock3 = ResidualBlock(self.num_filters, self.num_filters, bottleneck=False)
-        self.resblock4 = ResidualBlock(self.num_filters, self.num_filters, bottleneck=False)
-        self.resblock5 = ResidualBlock(self.num_filters, self.num_filters, bottleneck=False)
-        self.resblock6 = ResidualBlock(self.num_filters, self.num_filters, bottleneck=False)
-        self.resblock7 = ResidualBlock(self.num_filters, self.num_filters, bottleneck=False)
+        self.resblocks = nn.ModuleList()
+        for i in range(self.num_resblocks):
+            self.resblocks.append(ResidualBlock(self.num_filters, self.num_filters, bottleneck=False))
+
+        self.resblock = ResidualBlock(self.num_filters, self.num_filters, bottleneck=False)
 
         self.avgpool2 = nn.AdaptiveAvgPool1d(1)
         self.dropout = nn.Dropout(0.2)
@@ -155,125 +154,14 @@ class ResNet(nn.Module):
         x = self.relu(self.bn1(self.conv1(x)))
         x = self.maxpool(x)
 
-        x = self.resblock1(x)
-        x = self.resblock2(x)
-        x = self.resblock3(x)
-        x = self.resblock4(x)
-        x = self.resblock5(x)
-        #x = self.resblock6(x)
-        #x = self.resblock7(x)
+        for resblock in self.resblocks:
+            x = resblock(x)
 
         x = self.avgpool2(x)
         x = x.view(x.size(0), -1)
         x = self.dropout(x)
         x = self.fc(x)
         return x
-
-class InceptionModule1D(nn.Module):
-    def __init__(self, in_channels, out_1x1, out_3x3, out_5x5):
-        super(InceptionModule1D, self).__init__()
-        
-        self.branch1x1 = nn.Sequential(
-            nn.Conv1d(in_channels, out_1x1, kernel_size=1),
-            nn.BatchNorm1d(out_1x1),
-            nn.ReLU(inplace=True)
-        )
-        
-        self.branch3x3 = nn.Sequential(
-            nn.Conv1d(in_channels, out_3x3, kernel_size=3, padding=1),
-            nn.BatchNorm1d(out_3x3),
-            nn.ReLU(inplace=True)
-        )
-        
-        self.branch5x5 = nn.Sequential(
-            nn.Conv1d(in_channels, out_5x5, kernel_size=5, padding=2),
-            nn.BatchNorm1d(out_5x5),
-            nn.ReLU(inplace=True)
-        )
-        
-        self.branch_pool = nn.Sequential(
-            nn.MaxPool1d(kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm1d(in_channels),
-            nn.ReLU(inplace=True)
-        )
-        
-    def forward(self, x):
-        branch1x1 = self.branch1x1(x)
-        branch3x3 = self.branch3x3(x)
-        branch5x5 = self.branch5x5(x)
-        branch_pool = self.branch_pool(x)
-        
-        outputs = [branch1x1, branch3x3, branch5x5, branch_pool]
-        return torch.cat(outputs, 1)
-
-
-class MultiPathNet(nn.Module):
-    def __init__(self, num_channels, num_classes):
-        super(MultiPathNet, self).__init__()
-
-        self.avgpool1 = nn.AvgPool1d(4, 4)
-        
-        self.conv1 = nn.Conv1d(num_channels, 64, kernel_size=7, stride=2, padding=3)
-        self.bn1 = nn.BatchNorm1d(64)
-        self.maxpool1 = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
-        
-        self.conv2 = nn.Conv1d(64, 32, kernel_size=3, stride=1, padding=1)
-        self.bn2 = nn.BatchNorm1d(32)
-        self.maxpool2 = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
-
-        self.inception3a = InceptionModule1D(32, 32, 32, 32)
-        self.inception3b = InceptionModule1D(128, 128, 128, 128)
-
-        self.avgpool2 = nn.AvgPool1d(kernel_size=3, stride=2, padding=1)
-        self.conv3 = nn.Conv1d(512, 32, 3)
-        self.bn3 = nn.BatchNorm1d(32)
-
-        self.inception4a = InceptionModule1D(32, 32, 32, 32)
-        self.inception4b = InceptionModule1D(128, 128, 128, 128)
-
-        self.avgpool3 = nn.AvgPool1d(kernel_size=3, stride=2, padding=1)
-        self.conv4 = nn.Conv1d(512, 32, 3)
-        self.bn4 = nn.BatchNorm1d(32)
-        
-        self.inception5a = InceptionModule1D(32, 32, 32, 32)
-        self.inception5b = InceptionModule1D(128, 128, 128, 128)
-
-        self.avgpool = nn.AdaptiveAvgPool1d(1)
-        self.fc = nn.Linear(512, num_classes)
-
-        self.relu = nn.ReLU()
-        
-    def forward(self, x):
-        x = x.permute(0, 2, 1)
-
-        x = self.avgpool1(x)
-
-        x = self.relu(self.bn1(self.conv1(x)))
-        x = self.maxpool1(x)
-
-        x = self.relu(self.bn2(self.conv2(x)))
-        x = self.maxpool2(x)
-
-        x = self.inception3a(x)
-        x = self.inception3b(x)
-
-        x = self.avgpool2(x)
-        x = self.relu(self.bn3(self.conv3(x)))
-
-        x = self.inception4a(x)
-        x = self.inception4b(x)
-
-        x = self.avgpool3(x)
-        x = self.relu(self.bn4(self.conv4(x)))
-
-        x = self.inception5a(x)
-        x = self.inception5b(x)
-
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        return x
-    
 
 class SimpleCNN(nn.Module):
     def __init__(self, num_channels, num_classes, num_filters):
@@ -290,7 +178,6 @@ class SimpleCNN(nn.Module):
 
         self.conv2 = nn.Conv1d(in_channels=self.num_filters, out_channels=self.num_filters * 2, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm1d(self.num_filters * 2)
-        self.avgpool2 = nn.AvgPool1d(kernel_size=3, stride=2, padding=1)
 
         self.conv3 = nn.Conv1d(in_channels=self.num_filters * 2, out_channels=self.num_filters * 4, kernel_size=3, padding=1)
         self.bn3 = nn.BatchNorm1d(self.num_filters * 4)
@@ -306,10 +193,9 @@ class SimpleCNN(nn.Module):
 
         x = self.relu(self.bn1(self.conv1(x)))
         x = self.relu(self.bn2(self.conv2(x)))
-        x = self.avgpool2(x)
         x = self.relu(self.bn3(self.conv3(x)))
 
-        x = self.avgpool3(x)
+        x = self.avgpool2(x)
         x = x.view(x.size(0), -1)
         x = self.dropout(x)
         x = self.fc(x)

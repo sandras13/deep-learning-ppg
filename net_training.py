@@ -118,6 +118,7 @@ def classic_train(X_data, y_data, num_channels, num_classes):
         gamma = 0.80
         batch_size = 128
         epochs = 50
+        num_resblocks = 3
 
         mlflow.log_param("Batch size", batch_size)
         mlflow.log_param("Learning rate", learning_rate)
@@ -125,10 +126,10 @@ def classic_train(X_data, y_data, num_channels, num_classes):
         mlflow.log_param("Gamma", gamma)
         mlflow.log_param("Weight decay", weight_decay)
         mlflow.log_param("Epochs", epochs)
+        mlflow.log_param("Number of ResBlocks", num_resblocks)
 
         #network = arch.DeepConvLSTM(num_channels, num_classes,  num_layers = 2, hidden_size = 128)
-        network = arch.ResNet(num_channels = num_channels, num_classes = num_classes)
-        #network = arch.MultiPathNet(num_channels, num_classes)
+        network = arch.ResNet(num_channels = num_channels, num_classes = num_classes, num_resblocks=num_resblocks)
         #network = arch.SimpleCNN(num_channels, num_classes, 64)
 
         print(network)
