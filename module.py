@@ -40,26 +40,28 @@ def load_WESAD(dataset_dir):
     condition = ((data[:, -1] >= 1) & (data[:, -1] <= 4))
     data = data[condition]
 
+    subj_data = data[:, 0]
     x_data = data[:, 1].reshape(-1, 1)
     y_data = data[:, -1] - 1
 
-    return x_data, y_data
+    return x_data, y_data, subj_data
 
 def load_AffectiveROAD():
     x_data = np.empty((0, 2))
     y_data = np.empty((0, 1))
+    subj_data = np.empty((0, 1))
     subj_metric_timestamps = pd.read_csv('AffectiveROAD_Data\Database\Subj_metric\Annot_Subjective_metric.csv')
 
-    start_vals_SM = np.array(subj_metric_timestamps['Z_Start'])
-    end_vals_SM = np.array(subj_metric_timestamps['Z_End.1'])
+    start_vals_SM = np.array(subj_metric_timestamps['City1_Start'])
+    end_vals_SM = np.array(subj_metric_timestamps['Z_Start.1'])
 
     seq_length = end_vals_SM - start_vals_SM
 
     left_wrist_timestamps = pd.read_csv('AffectiveROAD_Data\Database\E4\Annot_E4_Left.csv')
     right_wrist_timestamps = pd.read_csv('AffectiveROAD_Data\Database\E4\Annot_E4_Right.csv')
 
-    end_vals_LW = np.array(left_wrist_timestamps['Z_End.1'])
-    end_vals_RW = np.array(right_wrist_timestamps['Z_End.1'])
+    end_vals_LW = np.array(left_wrist_timestamps['Z_Start.1'])
+    end_vals_RW = np.array(right_wrist_timestamps['Z_Start.1'])
 
     start_vals_LW = end_vals_LW - seq_length
     start_vals_RW = end_vals_RW - seq_length
@@ -74,42 +76,60 @@ def load_AffectiveROAD():
     for ind in subj_list:
         lw_ppg = pd.read_csv(f'AffectiveROAD_Data\Database\E4\{ind + 1}-E4-Drv{ind + 1}\Left\BVP.csv')
         lw_ppg = lw_ppg[start_vals_LW[ind]:end_vals_LW[ind]]
+        #lw_ppg = resample_signal(lw_ppg, 64, 4)
 
         rw_ppg = pd.read_csv(f'AffectiveROAD_Data\Database\E4\{ind + 1}-E4-Drv{ind + 1}\Right\BVP.csv')
         rw_ppg = rw_ppg[start_vals_RW[ind]:end_vals_RW[ind]]
+        #rw_ppg = resample_signal(rw_ppg, 64, 4)
+
+        lw_eda = pd.read_csv(f'AffectiveROAD_Data\Database\E4\{ind + 1}-E4-Drv{ind + 1}\Left\EDA.csv')
+        lw_eda = np.array(lw_eda)
+        #lw_eda = np.repeat(lw_eda, 16, axis = 0)
+        lw_eda = resample_signal(lw_eda, 4, 64)
+        lw_eda = lw_eda[start_vals_LW[ind]:end_vals_LW[ind]]
+
+        rw_eda = pd.read_csv(f'AffectiveROAD_Data\Database\E4\{ind + 1}-E4-Drv{ind + 1}\Right\EDA.csv')
+        rw_eda = np.array(rw_eda)
+        #rw_eda = np.repeat(rw_eda, 16, axis = 0)
+        rw_eda = resample_signal(rw_eda, 4, 64)
+        rw_eda = rw_eda[start_vals_RW[ind]:end_vals_RW[ind]]
 
         sm = pd.read_csv(f'AffectiveROAD_Data\Database\Subj_metric\SM_Drv{ind + 1}.csv')
         sm = sm[start_vals_SM[ind]:end_vals_SM[ind]]
         sm = np.array(sm)
-        sm = np.repeat(sm, 16, axis = 0)
+        #sm = np.repeat(sm, 16, axis = 0)
+        sm = resample_signal(sm, 4, 64)
 
-        #subj_ind = np.full((len(lw_ppg), 1), ind)
+        subj_ind = np.full((len(lw_ppg), 1), ind)
+        #fusion = np.hstack((lw_ppg, rw_ppg, lw_eda, rw_eda))
         fusion = np.hstack((lw_ppg, rw_ppg))
+
         x_data = np.vstack((x_data, fusion))
         y_data = np.vstack((y_data, sm))
+        subj_data = np.vstack((subj_data, subj_ind))
         
-    return x_data, y_data
+    return x_data, y_data, subj_data
 
 def import_data(dataset_id):
     if dataset_id == 1:
         labels = ('baseline', 'stress', 'amusement', 'meditation')
         dataset_dir = 'WESAD'
-        x_data, y_data = load_WESAD(dataset_dir)
+        x_data, y_data, subj_data = load_WESAD(dataset_dir)
         fs = 64
         window_size = 512
-        overlap = 256
+        overlap = window_size*3//4
         avg = False
 
     elif dataset_id == 2:
         labels = ('low', 'medium', 'high')
         dataset_dir = 'AffectiveROAD'
-        x_data, y_data = load_AffectiveROAD()
+        x_data, y_data, subj_data = load_AffectiveROAD()
         fs = 64
         window_size = 512
-        overlap = 256
+        overlap = window_size*3//4
         avg = True
 
-    return x_data, y_data, labels, fs, window_size, overlap, avg
+    return x_data, y_data, subj_data, labels, fs, window_size, overlap, avg
 
 def scale_data(x_data, y_data):
     scaled_data = StandardScaler().fit_transform(x_data, y_data)
@@ -127,6 +147,7 @@ def plot_data(y_data, labels):
     class_counts = np.bincount(y_data)
     plt.bar(labels, class_counts)
     plt.show()
+    print(class_counts)
 
 def get_class_weights(y_data):
     class_weights = compute_class_weight('balanced', classes=np.unique(y_data), y=y_data)
@@ -135,11 +156,11 @@ def get_class_weights(y_data):
     return class_weights
 
 def map_values(val):
-    if val < 0.35: return 0
-    if val < 0.7: return 1
+    if val < 0.4: return 0
+    if val < 0.75: return 1
     return 2
 
-def apply_sliding_window(features, targets, window_size, overlap, avg = False):
+def apply_sliding_window(features, targets, subj_data, window_size, overlap, avg = False):
     sliding_X_data = []
     sliding_y_data = []
     i = 0
@@ -147,16 +168,18 @@ def apply_sliding_window(features, targets, window_size, overlap, avg = False):
     while i < len(features) - window_size:
         window_X = features[i:i + window_size]
         window_y = targets[i:i + window_size]
+        subj_window = subj_data[i:i + window_size]
 
-        if avg:
-            y_avg = np.mean(window_y)
-            y_mapped = map_values(y_avg)
-            sliding_X_data.append(window_X)
-            sliding_y_data.append(y_mapped)
+        if len(np.unique(subj_window) == 1):
+            if avg:
+                y_avg = np.mean(window_y)
+                y_mapped = map_values(y_avg)
+                sliding_X_data.append(window_X)
+                sliding_y_data.append(y_mapped)
 
-        elif len(np.unique(window_y) == 1):
-            sliding_X_data.append(window_X)
-            sliding_y_data.append(window_y[-1])
+            elif len(np.unique(window_y) == 1):
+                sliding_X_data.append(window_X)
+                sliding_y_data.append(window_y[-1])
 
         i += (window_size - overlap)
     

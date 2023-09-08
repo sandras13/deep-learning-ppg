@@ -27,11 +27,11 @@ def crossvalid(X_data, y_data, num_channels, num_classes):
 
     with mlflow.start_run():
         learning_rate = 0.001
-        weight_decay = 5e-4
+        weight_decay = 1e-6
         step_size = 3
-        gamma = 0.8
+        gamma = 0.80
         batch_size = 128
-        epochs = 30
+        epochs = 50
 
         mlflow.log_param("Batch size", batch_size)
         mlflow.log_param("Learning rate", learning_rate)
@@ -105,3 +105,56 @@ def crossvalid(X_data, y_data, num_channels, num_classes):
         mlflow.log_param("Accuracy - val", mean_accuracies_val)
         mlflow.log_param("Recall - val", mean_recalls_val)
         mlflow.log_param("Precision - val", mean_precisions_val)
+
+def classic_train(X_data, y_data, num_channels, num_classes):
+    mlflow.set_tracking_uri("http://localhost:5000")
+
+    X_train, X_val, y_train, y_val = hm.split_data(X_data, y_data, train_size = 0.8)
+
+    with mlflow.start_run():
+        learning_rate = 0.001
+        weight_decay = 1e-6
+        step_size = 3
+        gamma = 0.80
+        batch_size = 128
+        epochs = 50
+
+        mlflow.log_param("Batch size", batch_size)
+        mlflow.log_param("Learning rate", learning_rate)
+        mlflow.log_param("Step size", step_size)
+        mlflow.log_param("Gamma", gamma)
+        mlflow.log_param("Weight decay", weight_decay)
+        mlflow.log_param("Epochs", epochs)
+
+        #network = arch.DeepConvLSTM(num_channels, num_classes,  num_layers = 2, hidden_size = 128)
+        network = arch.ResNet(num_channels = num_channels, num_classes = num_classes)
+        #network = arch.MultiPathNet(num_channels, num_classes)
+        #network = arch.SimpleCNN(num_channels, num_classes, 64)
+
+        print(network)
+        scheduler = None
+
+        optimizer = torch.optim.Adam(network.parameters(), lr=learning_rate, weight_decay=weight_decay)
+        class_weights = hm.get_class_weights(y_data)
+        criterion = nn.CrossEntropyLoss(weight=class_weights)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=gamma)
+
+        trainloader, valloader = hm.data_loader(X_train, y_train, X_val, y_val, batch_size)
+        for epoch in range(epochs):
+            print(f"Epoch {epoch + 1}:")
+            avg_loss_train, f1_train, accuracy_train, recall_train, precision_train = \
+                hm.train(trainloader, network, optimizer, criterion, scheduler)
+            avg_loss_val, f1_val, accuracy_val, recall_val, precision_val = \
+                hm.valid(valloader, network, criterion)
+            
+            mlflow.log_metric("Loss - train", avg_loss_train, step = epoch)
+            mlflow.log_metric("Accuracy - train", accuracy_train, step = epoch)
+            mlflow.log_metric("Recall - train", recall_train, step = epoch)
+            mlflow.log_metric("F1 score - train", f1_train, step = epoch)
+            mlflow.log_metric("Precision - train", precision_train, step = epoch)
+
+            mlflow.log_metric("Loss - valid", avg_loss_val, step = epoch)
+            mlflow.log_metric("Accuracy - valid", accuracy_val, step = epoch)
+            mlflow.log_metric("Recall - valid", recall_val, step = epoch)
+            mlflow.log_metric("F1 score - valid", f1_val, step = epoch)
+            mlflow.log_metric("Precision - valid", precision_val, step = epoch)
