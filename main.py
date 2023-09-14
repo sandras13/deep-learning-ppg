@@ -2,30 +2,44 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import module as hm
-import torch.optim.lr_scheduler as lr_scheduler
-import architectures as arch
-import mlflow
-import mlflow.pytorch
-from sklearn.model_selection import KFold
-import net_training as nt
+import preprocessing
+import architectures
+import network_training
+import plotting
+import train_with_mlflow as ml
 
-np.random.seed(256)
-torch.manual_seed(256)
+params = {
+    "seed" : 256,
+    "learning_rate" : 0.001,
+    "weight_decay" : 1e-6,
+    "step_size" : 3,
+    "gamma" : 0.85,
+    "batch_size" : 128,
+    "epochs" : 30,
+    "num_resblocks" : 5,
+    "num_lstm_layers" : 2,
+}
 
-features, targets, subj_data, labels, fs, window_size, overlap, avg = hm.import_data(dataset_id = 1)
-scaled_data = hm.scale_data(features, targets)
+np.random.seed(params["seed"])
+torch.manual_seed(params["seed"])
 
-sliding_X_data, sliding_y_data = hm.apply_sliding_window(scaled_data, targets, subj_data, window_size, overlap, avg)
+features, targets, subj_data, labels, fs, avg = preprocessing.load_data(dataset_id = 2)
+params["window_size"] = fs * 16
+params["overlap"] = params["window_size"] * 3//4
+scaled_data = preprocessing.scale_data(features, targets)
+
+sliding_X_data, sliding_y_data = preprocessing.apply_sliding_window(scaled_data, targets, subj_data,
+                                                         params["window_size"], params["overlap"], avg, num_classes=3)
 
 X_data = sliding_X_data.astype(np.float32)
 y_data = sliding_y_data.astype(np.uint8)
-hm.plot_data(y_data, labels)
+# plotting.plot_data(y_data, labels)
 
 print(X_data.shape, y_data.shape)
 
-num_channels = X_data.shape[2]
-num_classes = len(labels)
+params["num_channels"] = X_data.shape[2]
+params["num_classes"] = len(labels)
 
-#nt.crossvalid(X_data, y_data, num_channels, num_classes)
-nt.classic_train(X_data, y_data, num_channels, num_classes)
+architecure_id = 1 # LSTM - 1, ResNet - 2, CNN - 3
+
+ml.mlflow_training_loop(X_data, y_data, params, architecure_id, crossvalid=False)
