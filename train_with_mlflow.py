@@ -81,10 +81,8 @@ def mlflow_training_loop(X_data, y_data, params, architecure_id, crossvalid = Fa
             print(f"Fold {fold+1}/{num_folds if crossvalid else 1}")
             if architecure_id == 1:
                 network = arch.DeepConvLSTM(params["num_channels"], params["num_classes"], num_layers=params["num_lstm_layers"], hidden_size=128)
-            elif architecure_id == 2:
-                network = arch.ResNet(params["num_channels"], params["num_classes"], num_resblocks=params["num_resblocks"])
             else:
-                network = arch.SimpleCNN(params["num_channels"], params["num_classes"]) 
+                network = arch.ResNet(params["num_channels"], params["num_classes"], num_resblocks=params["num_resblocks"])
             
             if fold == 0: print(network)
 

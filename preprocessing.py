@@ -46,7 +46,7 @@ def load_AffectiveROAD():
     subj_data = np.empty((0, 1))
     subj_metric_timestamps = pd.read_csv('AffectiveROAD_Data\Database\Subj_metric\Annot_Subjective_metric.csv')
 
-    start_vals_SM = np.array(subj_metric_timestamps['City1_Start'])
+    start_vals_SM = np.array(subj_metric_timestamps['Z_End'])
     end_vals_SM = np.array(subj_metric_timestamps['Z_Start.1'])
 
     seq_length = end_vals_SM - start_vals_SM
@@ -60,7 +60,7 @@ def load_AffectiveROAD():
     start_vals_LW = end_vals_LW - seq_length
     start_vals_RW = end_vals_RW - seq_length
 
-    subj_list = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    subj_list = [i for i in range(13)]
 
     start_vals_LW *= 16
     end_vals_LW *= 16
@@ -93,7 +93,7 @@ def load_data(dataset_id):
     if dataset_id == 1:
         labels = ('baseline', 'stress', 'amusement', 'meditation')
         dataset_dir = 'WESAD'
-        x_data, y_data, subj_data = load_WESAD('dataset_dir')
+        x_data, y_data, subj_data = load_WESAD(dataset_dir)
         fs = 64
         avg = False
 
