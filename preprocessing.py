@@ -20,7 +20,7 @@ def load_WESAD(dataset_dir):
     data = np.empty((0, 3))
 
     for subject in subj_list:
-        obj = pd.read_pickle(f'{dataset_dir}/S{subject}/S{subject}.pkl')
+        obj = pd.read_pickle(f'{dataset_dir}\S{subject}\S{subject}.pkl')
         ppg = np.array(obj['signal']['wrist']['BVP'])
         y_lab = obj['label']
         y_lab = resample_signal(y_lab, 700, 64)
@@ -40,22 +40,25 @@ def load_WESAD(dataset_dir):
 
     return x_data, y_data, subj_data
 
-def load_AffectiveROAD():
+def load_AffectiveROAD(dataset_dir):
     x_data = np.empty((0, 2))
     y_data = np.empty((0, 1))
     subj_data = np.empty((0, 1))
-    subj_metric_timestamps = pd.read_csv('AffectiveROAD_Data\Database\Subj_metric\Annot_Subjective_metric.csv')
+    subj_metric_timestamps = pd.read_csv(f'{dataset_dir}\Subj_metric\Annot_Subjective_metric.csv')
 
-    start_vals_SM = np.array(subj_metric_timestamps['Z_End'])
-    end_vals_SM = np.array(subj_metric_timestamps['Z_Start.1'])
+    route_start = 'Z_End'
+    route_end = 'Z_Start.1'
+
+    start_vals_SM = np.array(subj_metric_timestamps[route_start])
+    end_vals_SM = np.array(subj_metric_timestamps[route_end])
 
     seq_length = end_vals_SM - start_vals_SM
 
-    left_wrist_timestamps = pd.read_csv('AffectiveROAD_Data\Database\E4\Annot_E4_Left.csv')
-    right_wrist_timestamps = pd.read_csv('AffectiveROAD_Data\Database\E4\Annot_E4_Right.csv')
+    left_wrist_timestamps = pd.read_csv(f'{dataset_dir}\E4\Annot_E4_Left.csv')
+    right_wrist_timestamps = pd.read_csv(f'{dataset_dir}\E4\Annot_E4_Right.csv')
 
-    end_vals_LW = np.array(left_wrist_timestamps['Z_Start.1'])
-    end_vals_RW = np.array(right_wrist_timestamps['Z_Start.1'])
+    end_vals_LW = np.array(left_wrist_timestamps[route_end])
+    end_vals_RW = np.array(right_wrist_timestamps[route_end])
 
     start_vals_LW = end_vals_LW - seq_length
     start_vals_RW = end_vals_RW - seq_length
@@ -68,13 +71,13 @@ def load_AffectiveROAD():
     end_vals_RW *= 16
 
     for ind in subj_list:
-        lw_ppg = pd.read_csv(f'AffectiveROAD_Data\Database\E4\{ind + 1}-E4-Drv{ind + 1}\Left\BVP.csv')
+        lw_ppg = pd.read_csv(f'{dataset_dir}\E4\{ind + 1}-E4-Drv{ind + 1}\Left\BVP.csv')
         lw_ppg = lw_ppg[start_vals_LW[ind]:end_vals_LW[ind]]
 
-        rw_ppg = pd.read_csv(f'AffectiveROAD_Data\Database\E4\{ind + 1}-E4-Drv{ind + 1}\Right\BVP.csv')
+        rw_ppg = pd.read_csv(f'{dataset_dir}\E4\{ind + 1}-E4-Drv{ind + 1}\Right\BVP.csv')
         rw_ppg = rw_ppg[start_vals_RW[ind]:end_vals_RW[ind]]
 
-        sm = pd.read_csv(f'AffectiveROAD_Data\Database\Subj_metric\SM_Drv{ind + 1}.csv')
+        sm = pd.read_csv(f'{dataset_dir}\Subj_metric\SM_Drv{ind + 1}.csv')
         sm = sm[start_vals_SM[ind]:end_vals_SM[ind]]
         sm = np.array(sm)
         sm = resample_signal(sm, 4, 64)
@@ -82,7 +85,6 @@ def load_AffectiveROAD():
         subj_ind = np.full((len(lw_ppg), 1), ind)
         fusion = np.hstack((lw_ppg, rw_ppg))
 
-        # x_data = np.vstack((x_data, rw_ppg))
         x_data = np.vstack((x_data, fusion))
         y_data = np.vstack((y_data, sm))
         subj_data = np.vstack((subj_data, subj_ind))
@@ -99,7 +101,8 @@ def load_data(dataset_id):
 
     elif dataset_id == 2:
         labels = ('low', 'medium', 'high')
-        x_data, y_data, subj_data = load_AffectiveROAD()
+        dataset_dir = 'AffectiveROAD_Data\Database'
+        x_data, y_data, subj_data = load_AffectiveROAD(dataset_dir)
         fs = 64
         avg = True
 
@@ -123,21 +126,12 @@ def get_class_weights(y_data):
 
     return class_weights
 
-def map_values(val, num_classes):
-    if num_classes == 3:
-        if val < 0.45: return 0
-        if val < 0.75: return 1
-        return 2
-    
-    if num_classes == 2:
-        if val < 0.75: return 0
-        return 1
+def map_values(val):
+    if val < 0.45: return 0
+    if val < 0.75: return 1
+    return 2
 
-    # if val <= 0.33: return 0
-    # if val >= 0.67: return 1
-    # return 2
-
-def apply_sliding_window(features, targets, subj_data, window_size, overlap, avg = False, num_classes = None):
+def apply_sliding_window(features, targets, subj_data, window_size, overlap, avg = False):
     sliding_X_data = []
     sliding_y_data = []
     i = 0
@@ -150,7 +144,7 @@ def apply_sliding_window(features, targets, subj_data, window_size, overlap, avg
         if len(np.unique(subj_window) == 1):
             if avg:
                 y_avg = np.mean(window_y)
-                y_mapped = map_values(y_avg, num_classes)
+                y_mapped = map_values(y_avg)
                 sliding_X_data.append(window_X)
                 sliding_y_data.append(y_mapped)
 

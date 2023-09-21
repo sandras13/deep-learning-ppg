@@ -26,7 +26,7 @@ params["overlap"] = params["window_size"] * 7//8
 scaled_data = preprocessing.scale_data(features, targets)
 
 sliding_X_data, sliding_y_data = preprocessing.apply_sliding_window(scaled_data, targets, subj_data,
-                                                         params["window_size"], params["overlap"], avg, num_classes=3)
+                                                         params["window_size"], params["overlap"], avg)
 
 X_data = sliding_X_data.astype(np.float32)
 y_data = sliding_y_data.astype(np.uint8)
