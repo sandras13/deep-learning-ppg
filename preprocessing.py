@@ -40,19 +40,21 @@ def load_WESAD(dataset_dir):
 
     return x_data, y_data, subj_data
 
-def load_AffectiveROAD(dataset_dir):
-    x_data = np.empty((0, 2))
+def load_AffectiveROAD(dataset_dir, wrist):
+    # wrist: 0 - both, 1 - left, 2 - right
+
+    if wrist != 0: x_data = np.empty((0, 1))
+    else: x_data = np.empty((0, 2))
+
     y_data = np.empty((0, 1))
     subj_data = np.empty((0, 1))
     subj_metric_timestamps = pd.read_csv(f'{dataset_dir}\Subj_metric\Annot_Subjective_metric.csv')
 
-    route_start = 'Z_End'
-    route_end = 'Z_Start.1'
+    route_start = 'Z_Start'
+    route_end = 'Z_End.1'
 
     start_vals_SM = np.array(subj_metric_timestamps[route_start])
     end_vals_SM = np.array(subj_metric_timestamps[route_end])
-
-    seq_length = end_vals_SM - start_vals_SM
 
     left_wrist_timestamps = pd.read_csv(f'{dataset_dir}\E4\Annot_E4_Left.csv')
     right_wrist_timestamps = pd.read_csv(f'{dataset_dir}\E4\Annot_E4_Right.csv')
@@ -60,38 +62,49 @@ def load_AffectiveROAD(dataset_dir):
     end_vals_LW = np.array(left_wrist_timestamps[route_end])
     end_vals_RW = np.array(right_wrist_timestamps[route_end])
 
-    start_vals_LW = end_vals_LW - seq_length
-    start_vals_RW = end_vals_RW - seq_length
-
     subj_list = [i for i in range(13)]
 
-    start_vals_LW *= 16
-    end_vals_LW *= 16
-    start_vals_RW *= 16
-    end_vals_RW *= 16
-
     for ind in subj_list:
-        lw_ppg = pd.read_csv(f'{dataset_dir}\E4\{ind + 1}-E4-Drv{ind + 1}\Left\BVP.csv')
-        lw_ppg = lw_ppg[start_vals_LW[ind]:end_vals_LW[ind]]
+        if ind == 1:
+            lw_ppg1 = pd.read_csv(f'{dataset_dir}\E4\{ind + 1}-E4-Drv{ind + 1}\Left1\BVP.csv')
+            lw_ppg2 = pd.read_csv(f'{dataset_dir}\E4\{ind + 1}-E4-Drv{ind + 1}\Left2\BVP.csv')
+            lw_ppg = np.vstack((lw_ppg1, lw_ppg2))
+        else:
+            lw_ppg = pd.read_csv(f'{dataset_dir}\E4\{ind + 1}-E4-Drv{ind + 1}\Left\BVP.csv')
+            lw_ppg = np.array(lw_ppg)
 
         rw_ppg = pd.read_csv(f'{dataset_dir}\E4\{ind + 1}-E4-Drv{ind + 1}\Right\BVP.csv')
-        rw_ppg = rw_ppg[start_vals_RW[ind]:end_vals_RW[ind]]
+        rw_ppg = np.array(rw_ppg)
 
         sm = pd.read_csv(f'{dataset_dir}\Subj_metric\SM_Drv{ind + 1}.csv')
-        sm = sm[start_vals_SM[ind]:end_vals_SM[ind]]
         sm = np.array(sm)
+
+        if(end_vals_SM[ind] > len(sm)):
+            end_vals_SM[ind] = len(sm)
+
+        seq_length = end_vals_SM[ind] - start_vals_SM[ind] - 1
+
+        lw_ppg = lw_ppg[(end_vals_LW[ind] - seq_length)*16:end_vals_LW[ind]*16]
+        rw_ppg = rw_ppg[(end_vals_RW[ind] - seq_length)*16:end_vals_RW[ind]*16]
+        sm = sm[start_vals_SM[ind]:end_vals_SM[ind]]
+        
         sm = resample_signal(sm, 4, 64)
 
         subj_ind = np.full((len(lw_ppg), 1), ind)
         fusion = np.hstack((lw_ppg, rw_ppg))
 
-        x_data = np.vstack((x_data, fusion))
+        if wrist == 0: x_data = np.vstack((x_data, fusion))
+        elif wrist == 1: x_data = np.vstack((x_data, lw_ppg))
+        else: x_data = np.vstack((x_data, rw_ppg))
+
         y_data = np.vstack((y_data, sm))
         subj_data = np.vstack((subj_data, subj_ind))
-        
+    
+    y_data = y_data.reshape(-1, )
+    print(len(x_data), len(subj_data), len(y_data))
     return x_data, y_data, subj_data
 
-def load_data(dataset_id):
+def load_data(dataset_id, wrist = None):
     if dataset_id == 1:
         labels = ('baseline', 'stress', 'amusement', 'meditation')
         dataset_dir = 'WESAD'
@@ -102,7 +115,7 @@ def load_data(dataset_id):
     elif dataset_id == 2:
         labels = ('low', 'medium', 'high')
         dataset_dir = 'AffectiveROAD_Data\Database'
-        x_data, y_data, subj_data = load_AffectiveROAD(dataset_dir)
+        x_data, y_data, subj_data = load_AffectiveROAD(dataset_dir, wrist)
         fs = 64
         avg = True
 
@@ -127,7 +140,7 @@ def get_class_weights(y_data):
     return class_weights
 
 def map_values(val):
-    if val < 0.45: return 0
+    if val < 0.4: return 0
     if val < 0.75: return 1
     return 2
 
