@@ -1,7 +1,5 @@
 import numpy as np
 import torch
-import mlflow
-import mlflow.pytorch
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from torch.utils.data import DataLoader
@@ -23,10 +21,11 @@ def print_gradients(model):
 def print_score(preds, true):
     f1 = f1_score(true, preds, average='macro')
     acc = accuracy_score(true, preds)
-    rec = recall_score(true, preds, average='macro')
     prec = precision_score(true, preds, average='macro')
-    print(f1, acc, rec, prec)
-    return f1, acc, rec, prec
+    rec = recall_score(true, preds, average='macro')
+   
+    print(f1, acc, prec, rec)
+    return f1, acc, prec, rec
 
 def split_data(X_data, y_data, train_size):
     X_train, X_val, y_train, y_val = train_test_split(X_data, y_data, train_size=train_size)
@@ -55,6 +54,7 @@ def train(data_loader, model, optimizer, criterion, scheduler = None):
         y_true = targets.numpy().flatten()
             
         total_loss += loss.item()
+        
         # if batch_num % cnt == 0:
         #     print(f"Average loss: {total_loss / cnt:.4f}")
         #     total_loss = 0
@@ -69,12 +69,11 @@ def train(data_loader, model, optimizer, criterion, scheduler = None):
         print(f"Current learning rate: {scheduler.get_last_lr()}")
         scheduler.step()
         
-    f1_train, accuracy_train, recall_train, precision_train = print_score(train_preds, train_gt)
-    # print(train_preds, train_gt)
+    f1_train, accuracy_train, precision_train, recall_train = print_score(train_preds, train_gt)
 
     avg_loss = total_loss / batch_num
 
-    return avg_loss, f1_train, accuracy_train, recall_train, precision_train
+    return avg_loss, f1_train, accuracy_train, precision_train, recall_train
         
 def valid(data_loader, model, criterion):
     model.eval()
@@ -100,11 +99,10 @@ def valid(data_loader, model, criterion):
             total_loss += loss.item()
             batch_num += 1
 
-    # print(val_preds, val_gt)
-    f1_val, accuracy_val, recall_val, precision_val = print_score(val_preds, val_gt)
+    f1_val, accuracy_val, precision_val, recall_val,  = print_score(val_preds, val_gt)
     avg_loss = total_loss / batch_num
     
-    return avg_loss, f1_val, accuracy_val, recall_val, precision_val
+    return avg_loss, f1_val, accuracy_val, precision_val, recall_val
 
 
 

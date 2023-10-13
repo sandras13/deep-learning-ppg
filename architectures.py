@@ -3,9 +3,9 @@ import torch.nn as nn
 import numpy as np
 
 class ConvBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, use_relu=True):
+    def __init__(self, in_channels, out_channels, kernel_size=1, stride=1, padding=0, use_relu=True):
         super(ConvBlock, self).__init__()
-        self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, stride=stride, padding=padding)
+        self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding)
         self.bn = nn.BatchNorm1d(out_channels)
         self.relu = nn.ReLU(inplace=True) if use_relu else nn.Identity()
 
@@ -14,20 +14,20 @@ class ConvBlock(nn.Module):
         return out
 
 class DeepConvLSTM(nn.Module):
-    def __init__(self, num_channels, num_classes,  num_layers, hidden_size):
+    def __init__(self, num_channels, num_classes, num_layers, hidden_size):
         super(DeepConvLSTM, self).__init__()
         self.num_filters = 64
         self.num_convblocks = 4
 
-        self.avgpool = nn.AvgPool1d(kernel_size=4, stride=4)
         self.conv1 = ConvBlock(num_channels, self.num_filters, kernel_size=7, stride=2, padding=3, use_relu=True)
         self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
+        self.avgpool = nn.AvgPool1d(kernel_size=4, stride=4)
 
         self.convblocks = nn.ModuleList()
         for i in range(self.num_convblocks):
             self.convblocks.append(ConvBlock(self.num_filters, self.num_filters, kernel_size=3, stride=1, padding=1, use_relu=True))
         
-        self.lstm = nn.LSTM(input_size=64, hidden_size=hidden_size, num_layers=num_layers, batch_first=True)
+        self.lstm = nn.LSTM(input_size=self.num_filters, hidden_size=hidden_size, num_layers=num_layers, batch_first=True)
         self.dropout = nn.Dropout(0.2)
         self.fc = nn.Linear(hidden_size, num_classes)
         
@@ -102,7 +102,7 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         x = x.permute(0, 2, 1)
-        
+      
         x = self.conv1(x)
         x = self.maxpool(x)
         x = self.avgpool1(x)
@@ -116,3 +116,7 @@ class ResNet(nn.Module):
         x = self.dropout(x)
         x = self.fc(x)
         return x
+
+
+
+

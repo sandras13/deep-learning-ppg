@@ -2,16 +2,14 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import scipy.signal
 from scipy import signal
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_class_weight
-from scipy.signal import resample
 
 def resample_signal(data, original_sampling_rate, target_sampling_rate):
     original_time_axis = np.arange(0, len(data)) / original_sampling_rate
     target_time_axis = np.arange(0, original_time_axis[-1], 1 / target_sampling_rate)
-    resampled_data = resample(data, int(len(target_time_axis)))
+    resampled_data = signal.resample(data, int(len(target_time_axis)))
 
     return resampled_data
 
@@ -101,7 +99,6 @@ def load_AffectiveROAD(dataset_dir, wrist):
         subj_data = np.vstack((subj_data, subj_ind))
     
     y_data = y_data.reshape(-1, )
-    print(len(x_data), len(subj_data), len(y_data))
     return x_data, y_data, subj_data
 
 def load_data(dataset_id, wrist = None):
