@@ -40,7 +40,7 @@ def train(data_loader, model, optimizer, criterion, scheduler = None):
 
     total_loss = 0
     batch_num = 1
-    cnt = 10
+    # cnt = 10
 
     for inputs, targets in data_loader:
         optimizer.zero_grad()
@@ -54,7 +54,7 @@ def train(data_loader, model, optimizer, criterion, scheduler = None):
         y_true = targets.numpy().flatten()
             
         total_loss += loss.item()
-        
+
         # if batch_num % cnt == 0:
         #     print(f"Average loss: {total_loss / cnt:.4f}")
         #     total_loss = 0
@@ -99,7 +99,7 @@ def valid(data_loader, model, criterion):
             total_loss += loss.item()
             batch_num += 1
 
-    f1_val, accuracy_val, precision_val, recall_val,  = print_score(val_preds, val_gt)
+    f1_val, accuracy_val, precision_val, recall_val = print_score(val_preds, val_gt)
     avg_loss = total_loss / batch_num
     
     return avg_loss, f1_val, accuracy_val, precision_val, recall_val
