@@ -26,13 +26,13 @@ class DeepConvLSTM(nn.Module):
         self.convblocks = nn.ModuleList()
         for i in range(self.num_convblocks):
             self.convblocks.append(ConvBlock(self.num_filters, self.num_filters, kernel_size=3, stride=1, padding=1, use_relu=True))
-        
+
         self.lstm = nn.LSTM(input_size=self.num_filters, hidden_size=hidden_size, num_layers=num_layers, batch_first=True)
         self.dropout = nn.Dropout(0.2)
         self.fc = nn.Linear(hidden_size, num_classes)
-        
+
     def forward(self, x):
-        x = x.permute(0, 2, 1) 
+        x = x.permute(0, 2, 1)
 
         x = self.conv1(x)
         x = self.maxpool(x)
@@ -41,26 +41,54 @@ class DeepConvLSTM(nn.Module):
         for convblock in self.convblocks:
             x = convblock(x)
 
-        x = x.permute(0, 2, 1) 
+        x = x.permute(0, 2, 1)
         out, _ = self.lstm(x)
         out = out[:, -1, :]
 
         out = self.dropout(out)
         out = self.fc(out)
-        
+
         return out
-    
+
 class ResidualBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, stride=1, bottleneck=False):
+    def __init__(self, in_channels, out_channels, opt, stride=1):
         super(ResidualBlock, self).__init__()
-        self.bottleneck = bottleneck
-        if bottleneck:
-            self.conv1 = ConvBlock(in_channels, out_channels // 4, kernel_size=1, stride=1, padding=0)
-            self.conv2 = ConvBlock(out_channels // 4, out_channels // 4, kernel_size=3, stride=stride, padding=1)
-            self.conv3 = ConvBlock(out_channels // 4, out_channels, kernel_size=1, stride=1, padding=0, use_relu=False)
+        self.opt = opt
+        # 0 : single-branch ResBlock
+        # 1 : 1-3-5 ResBlock
+        # 2 : 3-5-7 ResBlock
+        # 3 : 3-5 ResBlock
+        # 4 : 1-3-5 ResBlock with Bottleneck
+
+        if self.opt == 0:
+            self.conv1_3 = ConvBlock(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
+            self.conv2_3 = ConvBlock(out_channels, out_channels, kernel_size=3, stride=1, padding=1, use_relu=False)
+
+        elif self.opt < 4:
+            self.conv1_3 = ConvBlock(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
+            self.conv2_3 = ConvBlock(out_channels, out_channels, kernel_size=3, stride=1, padding=1, use_relu=False)
+
+            self.conv1_5 = ConvBlock(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
+            self.conv2_5 = ConvBlock(out_channels, out_channels, kernel_size=3, stride=1, padding=1, use_relu=False)
+
+            if self.opt == 1:
+                self.conv1_1 = ConvBlock(in_channels, out_channels, kernel_size=1, padding = 0, stride=stride)
+                self.conv2_1 = ConvBlock(out_channels, out_channels, kernel_size=1, padding = 0, stride=1, use_relu=False)
+            
+            elif self.opt == 2:
+                self.conv1_1 = ConvBlock(in_channels, out_channels, kernel_size=7, padding = 3, stride=stride)
+                self.conv2_1 = ConvBlock(out_channels, out_channels, kernel_size=7, padding = 3, stride=1, use_relu=False)
+                
         else:
-            self.conv1 = ConvBlock(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
-            self.conv2 = ConvBlock(out_channels, out_channels, kernel_size=3, stride=1, padding=1, use_relu=False)
+            self.conv1_1 = ConvBlock(in_channels, out_channels, kernel_size=1, padding = 0, stride=stride, use_relu=False)
+
+            self.conv0_3 = ConvBlock(in_channels, out_channels//2, kernel_size=1, stride=stride, padding=0)
+            self.conv1_3 = ConvBlock(out_channels//2, out_channels//2, kernel_size=3, stride=stride, padding=1)
+            self.conv2_3 = ConvBlock(out_channels//2, out_channels, kernel_size=1, stride=1, padding=0, use_relu=False)
+
+            self.conv0_5 = ConvBlock(in_channels, out_channels//2, kernel_size=1, stride=stride, padding=0)
+            self.conv1_5 = ConvBlock(out_channels//2, out_channels//2, kernel_size=5, stride=stride, padding=2)
+            self.conv2_5 = ConvBlock(out_channels//2, out_channels, kernel_size=1, stride=1, padding=0, use_relu=False)
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_channels != out_channels:
@@ -69,23 +97,49 @@ class ResidualBlock(nn.Module):
     def forward(self, x):
         residual = self.shortcut(x)
 
-        out = self.conv1(x)
-        out = self.conv2(out)
+        if self.opt == 0:
+            out = self.conv1_3(x)
+            out = self.conv2_3(out)
+        
+        elif self.opt < 4:
+            out_3 = self.conv1_3(x)
+            out_3 = self.conv2_3(out_3)
 
-        if self.bottleneck:
-            out = self.conv3(out)
+            out_5 = self.conv0_5(x)
+            out_5 = self.conv1_5(out_5)
+
+            if self.opt != 3:
+                out_1 = self.conv1_1(x)
+                out_1 = self.conv2_1(out_1)
+                out = out_1 + out_3 + out_5
+
+            else: out = out_3 + out_5
+
+        else:
+            out_1 = self.conv1_1(x)
+
+            out_3 = self.conv0_3(x)
+            out_3 = self.conv1_3(out_3)
+            out_3 = self.conv2_3(out_3)
+
+            out_5 = self.conv0_5(x)
+            out_5 = self.conv1_5(out_5)
+            out_5 = self.conv2_5(out_5)
+
+            out = out_1 + out_3 + out_5
 
         out = out + residual
         out = nn.functional.relu(out)
         return out
 
 class ResNet(nn.Module):
-    def __init__(self, num_channels, num_classes, num_resblocks):
+    def __init__(self, num_channels, num_classes, num_resblocks, opt):
         super(ResNet, self).__init__()
 
         self.num_channels = num_channels
         self.num_classes = num_classes
         self.num_resblocks = num_resblocks
+        self.opt = opt
         self.num_filters = 64
 
         self.conv1 = ConvBlock(self.num_channels, self.num_filters, kernel_size=7, stride=2, padding=3, use_relu=True)
@@ -94,7 +148,7 @@ class ResNet(nn.Module):
 
         self.resblocks = nn.ModuleList()
         for i in range(self.num_resblocks):
-            self.resblocks.append(ResidualBlock(self.num_filters, self.num_filters, bottleneck=False))
+            self.resblocks.append(ResidualBlock(self.num_filters, self.num_filters, self.opt))
 
         self.avgpool2 = nn.AdaptiveAvgPool1d(1)
         self.dropout = nn.Dropout(0.2)
@@ -102,7 +156,7 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         x = x.permute(0, 2, 1)
-      
+
         x = self.conv1(x)
         x = self.maxpool(x)
         x = self.avgpool1(x)
@@ -112,11 +166,10 @@ class ResNet(nn.Module):
 
         x = self.avgpool2(x)
         x = x.view(x.size(0), -1)
-        
+
         x = self.dropout(x)
         x = self.fc(x)
         return x
-
 
 
 
