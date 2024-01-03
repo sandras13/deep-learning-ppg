@@ -122,14 +122,6 @@ def scale_data(x_data, y_data):
     scaled_data = StandardScaler().fit_transform(x_data, y_data)
     return scaled_data
 
-def filter_data(data, fs):
-    fnyq = fs / 2
-
-    filt = signal.butter(N = 2, Wn = 0.5 / fnyq, btype='high', fs = fs, output='sos', analog = False)
-    filt_data = signal.sosfilt(filt, data)
-
-    return filt_data
-
 def get_class_weights(y_data):
     class_weights = compute_class_weight('balanced', classes=np.unique(y_data), y=y_data)
     class_weights = torch.FloatTensor(class_weights)
