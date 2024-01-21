@@ -1,4 +1,4 @@
-#Deep Learning PPG
+# Deep Learning PPG
 
 This repository presents the implementation of the paper titled "PPGResNet – A Modular Deep Residual Network for Driver Stress Detection from PPG signal." We assessed our model's performance on two distinct publicly available datasets (AffectiveROAD and WESAD), achieving accuracies exceeding 98% for both, surpassing existing literature. The emphasis was on utilizing only the PPG signal. Our model incorporates Multi-branch Residual Blocks, where each branch employs convolution layers with varying filter sizes, enabling the model to capture a more diverse range of data.
 
