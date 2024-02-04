@@ -68,8 +68,8 @@ class ResidualBlock(nn.Module):
             self.conv1_3 = ConvBlock(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
             self.conv2_3 = ConvBlock(out_channels, out_channels, kernel_size=3, stride=1, padding=1, use_relu=False)
 
-            self.conv1_5 = ConvBlock(in_channels, out_channels, kernel_size=3, stride=stride, padding=1)
-            self.conv2_5 = ConvBlock(out_channels, out_channels, kernel_size=3, stride=1, padding=1, use_relu=False)
+            self.conv1_5 = ConvBlock(in_channels, out_channels, kernel_size=5, stride=stride, padding=2)
+            self.conv2_5 = ConvBlock(out_channels, out_channels, kernel_size=5, stride=1, padding=2, use_relu=False)
 
             if self.opt == 1:
                 self.conv1_1 = ConvBlock(in_channels, out_channels, kernel_size=1, padding = 0, stride=stride)
