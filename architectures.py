@@ -142,8 +142,8 @@ class ResNet(nn.Module):
         self.opt = opt
         self.num_filters = 64
 
-        self.conv1 = ConvBlock(self.num_channels, self.num_filters, kernel_size=7, stride=2, padding=3, use_relu=True)
         self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
+        self.conv1 = ConvBlock(self.num_channels, self.num_filters, kernel_size=7, stride=2, padding=3, use_relu=True)
         self.avgpool1 = nn.AvgPool1d(kernel_size=4, stride=4)
 
         self.resblocks = nn.ModuleList()
@@ -157,8 +157,8 @@ class ResNet(nn.Module):
     def forward(self, x):
         x = x.permute(0, 2, 1)
 
-        x = self.conv1(x)
         x = self.maxpool(x)
+        x = self.conv1(x)
         x = self.avgpool1(x)
 
         for resblock in self.resblocks:
